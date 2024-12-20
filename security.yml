@@ -1,0 +1,85 @@
+---
+- name: Sécurisation des serveurs
+  hosts: servers
+  become: true
+  tasks:
+
+    # 1. Installer UFW
+    - name: Installer UFW
+      apt:
+        name: ufw
+        state: present
+        update_cache: yes
+
+    - name: Configurer UFW (Pare-feu)
+      shell: |
+        ufw default deny incoming
+        ufw default allow outgoing
+        ufw allow ssh
+        ufw --force enable
+      args:
+        warn: false
+
+    # 2. Installer Fail2Ban
+    - name: Installer Fail2Ban
+      apt:
+        name: fail2ban
+        state: present
+
+    - name: Configurer Fail2Ban
+      copy:
+        src: ./jail.local
+        dest: /etc/fail2ban/jail.local
+      notify:
+        - Redémarrer Fail2Ban
+
+    # 3. Installer RKHunter
+    - name: Installer RKHunter
+      apt:
+        name: rkhunter
+        state: present
+
+    - name: Configurer RKHunter
+      shell: |
+        rkhunter --update
+        rkhunter --propupd
+
+    # 4. Installer Lynis
+    - name: Installer Lynis
+      apt:
+        name: lynis
+        state: present
+
+    # 5. Installer PortSentry
+    - name: Installer PortSentry
+      apt:
+        name: portsentry
+        state: present
+
+    - name: Configurer PortSentry
+      lineinfile:
+        path: /etc/portsentry/portsentry.conf
+        regexp: "^TCP_MODE=.*"
+        line: "TCP_MODE=\"atcp\""
+
+    - name: Redémarrer PortSentry
+      service:
+        name: portsentry
+        state: restarted
+
+    # 6. Installer Snort
+    - name: Installer Snort
+      apt:
+        name: snort
+        state: present
+      vars:
+        snort_debconf:
+          "snort/snort_interface": "eth0"
+      tags:
+        - snort
+
+  handlers:
+    - name: Redémarrer Fail2Ban
+      service:
+        name: fail2ban
+        state: restarted
